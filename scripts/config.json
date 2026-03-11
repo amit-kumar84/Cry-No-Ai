@@ -1,0 +1,30 @@
+{
+    "discord_client_id": "",
+    "app_name": "CRY-NO-AI Voice Assistant",
+    "version": "2.0",
+    "update_interval": 15,
+    "enable_party": true,
+    "web_dashboard_url": "",
+    "enable_web_sync": true,
+    "rich_presence": {
+        "large_images": ["logo", "working", "idle", "listening", "speaking"],
+        "small_images": ["python", "online", "away", "busy"],
+        "states": [
+            "🎤 Listening for commands",
+            "🔊 Processing voice input", 
+            "💤 Idle - Waiting",
+            "🧠 Learning new commands",
+            "🎧 In voice channel",
+            "📡 Connected to server"
+        ],
+        "buttons": [
+            {"label": "📊 Dashboard", "url": "https://example.com"},
+            {"label": "💻 GitHub", "url": "https://github.com"}
+        ]
+    },
+    "discord_bot": {
+        "token": "",
+        "target_user_id": "",
+        "enabled": false
+    }
+}

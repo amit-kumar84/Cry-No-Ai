@@ -1,0 +1,44 @@
+# Environment files - NEVER commit these!
+.env
+backend/.env
+frontend/.env
+*.env.local
+
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+/var/log/
+
+# Local scripts output
+images/
+*.exe
+
+# Test reports
+test_reports/
+coverage/
+
+# Memory/cache
+memory/
+.cache/

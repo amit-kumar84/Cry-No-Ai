@@ -1,0 +1,56 @@
+{
+  "total_tests": 8,
+  "passed_tests": 8,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "results": [
+    {
+      "test": "API Root Endpoint",
+      "success": true,
+      "details": "Message: Discord Voice Assistant API, Discord Available: True",
+      "response_data": null
+    },
+    {
+      "test": "Status Endpoint",
+      "success": true,
+      "details": "Status: online, Voice State: listening",
+      "response_data": null
+    },
+    {
+      "test": "Config Endpoint",
+      "success": true,
+      "details": "App: Test Voice Assistant, Update Interval: 15",
+      "response_data": null
+    },
+    {
+      "test": "Bot Status Endpoint",
+      "success": true,
+      "details": "Running: False, Discord Available: True, Clients: 2",
+      "response_data": null
+    },
+    {
+      "test": "Status Update Endpoint",
+      "success": true,
+      "details": "Message: Status updated",
+      "response_data": null
+    },
+    {
+      "test": "Config Update Endpoint",
+      "success": true,
+      "details": "Message: Configuration updated",
+      "response_data": null
+    },
+    {
+      "test": "History Endpoint",
+      "success": true,
+      "details": "Retrieved 0 history records",
+      "response_data": null
+    },
+    {
+      "test": "WebSocket Connection",
+      "success": true,
+      "details": "Successfully connected and received data",
+      "response_data": null
+    }
+  ]
+}
