@@ -9,7 +9,9 @@ import {
   Wifi,
   WifiOff,
   MonitorPlay,
-  AudioWaveform
+  AudioWaveform,
+  UserPlus,
+  ExternalLink
 } from 'lucide-react';
 
 const VOICE_STATES = {
@@ -310,6 +312,9 @@ export const VoiceStateIndicator = ({ voiceState, status }) => {
             active={status.is_in_vc}
           />
         </div>
+
+        {/* Invite Button */}
+        <InviteButton />
       </div>
 
       {/* Corner decorations with glow */}
@@ -366,3 +371,90 @@ const QuickStatus = ({ icon: Icon, label, active, warning, speaking, listening }
     </div>
   </motion.div>
 );
+
+// Discord Invite Button Component
+const InviteButton = () => {
+  // Discord Bot Invite URL - Replace CLIENT_ID with your actual Discord Application ID
+  const DISCORD_CLIENT_ID = process.env.REACT_APP_DISCORD_CLIENT_ID || '656804552175124481';
+  const inviteUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&permissions=3147776&scope=bot%20applications.commands`;
+
+  return (
+    <motion.a
+      href={inviteUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-6 w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#5865F2]/20 border border-[#5865F2]/50 rounded-none cut-corner cursor-pointer group relative overflow-hidden"
+      data-testid="discord-invite-btn"
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+    >
+      {/* Animated background gradient */}
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-r from-[#5865F2]/0 via-[#5865F2]/20 to-[#5865F2]/0"
+        animate={{
+          x: ['-100%', '100%']
+        }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          ease: 'linear'
+        }}
+      />
+      
+      {/* Discord Logo SVG */}
+      <motion.div
+        className="relative z-10"
+        animate={{
+          rotate: [0, -5, 5, 0]
+        }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          ease: 'easeInOut'
+        }}
+      >
+        <svg 
+          width="24" 
+          height="24" 
+          viewBox="0 0 24 24" 
+          fill="currentColor" 
+          className="text-[#5865F2] group-hover:text-white transition-colors duration-300"
+        >
+          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+        </svg>
+      </motion.div>
+
+      {/* Button Text */}
+      <span className="relative z-10 text-sm font-semibold tracking-wide text-[#5865F2] group-hover:text-white transition-colors duration-300">
+        Invite me to your Discord Server
+      </span>
+
+      {/* External Link Icon */}
+      <motion.div
+        className="relative z-10"
+        animate={{
+          x: [0, 3, 0],
+          y: [0, -3, 0]
+        }}
+        transition={{
+          duration: 1.5,
+          repeat: Infinity,
+          ease: 'easeInOut'
+        }}
+      >
+        <ExternalLink className="w-4 h-4 text-[#5865F2]/70 group-hover:text-white/70 transition-colors duration-300" />
+      </motion.div>
+
+      {/* Glow effect on hover */}
+      <motion.div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        style={{
+          boxShadow: '0 0 20px rgba(88, 101, 242, 0.5), inset 0 0 20px rgba(88, 101, 242, 0.1)'
+        }}
+      />
+    </motion.a>
+  );
+};
