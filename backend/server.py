@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import asyncio
 import json
 
@@ -33,6 +33,10 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+DB_RETRY_BACKOFF_SECONDS = 60
+db_write_blocked_until: Optional[datetime] = None
+db_write_in_outage = False
 
 # ========== MODELS ==========
 
@@ -66,6 +70,39 @@ class ConfigUpdate(BaseModel):
     target_user_id: Optional[str] = None
     app_name: Optional[str] = None
     update_interval: Optional[int] = None
+
+
+async def persist_status_to_db(status: DiscordStatus):
+    global db_write_blocked_until, db_write_in_outage
+
+    now = datetime.now(timezone.utc)
+    if db_write_blocked_until and now < db_write_blocked_until:
+        return False
+
+    try:
+        doc = status.model_dump(mode='json')
+        await db.discord_status.update_one(
+            {"user_id": status.user_id},
+            {"$set": doc},
+            upsert=True
+        )
+
+        if db_write_in_outage:
+            logger.info("MongoDB persistence recovered")
+            db_write_in_outage = False
+
+        db_write_blocked_until = None
+        return True
+    except Exception as e:
+        db_write_blocked_until = now + timedelta(seconds=DB_RETRY_BACKOFF_SECONDS)
+        if not db_write_in_outage:
+            logger.warning(
+                "MongoDB persistence unavailable; continuing realtime updates without database writes for %ss: %s",
+                DB_RETRY_BACKOFF_SECONDS,
+                e,
+            )
+            db_write_in_outage = True
+        return False
 
 # ========== GLOBAL STATE ==========
 
@@ -234,16 +271,11 @@ try:
                 status.voice_state = "none"
                 logger.info(f"📊 Status: {status.username} | {status.status} | Not in VC")
                 
-            # Save to database
-            doc = status.model_dump(mode='json')
-            await db.discord_status.update_one(
-                {"user_id": status.user_id},
-                {"$set": doc},
-                upsert=True
-            )
-            
             # Broadcast to all WebSocket clients
             await self.manager.broadcast(status)
+
+            # Save to database without blocking realtime delivery
+            await persist_status_to_db(status)
             
         async def status_monitor_loop(self):
             """Periodically check and update target user status"""

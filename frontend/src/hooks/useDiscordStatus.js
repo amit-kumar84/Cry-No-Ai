@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+const normalizeBaseUrl = (url) => url.trim().replace(/\/+$/, '');
+
 // Get backend URL from environment variable
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+const BACKEND_URL = normalizeBaseUrl(process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001');
 
 // Convert HTTP to WebSocket URL
 const getWebSocketUrl = (httpUrl) => {
-  return httpUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+  return normalizeBaseUrl(httpUrl)
+    .replace('https://', 'wss://')
+    .replace('http://', 'ws://');
 };
 
 const WS_URL = getWebSocketUrl(BACKEND_URL);
