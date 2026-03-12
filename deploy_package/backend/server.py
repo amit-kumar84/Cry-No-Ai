@@ -58,30 +58,14 @@ class DiscordStatus(BaseModel):
     is_self_deafened: bool = False
     is_streaming: bool = False
     is_video: bool = False
+    is_speaking: bool = False
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class RichPresenceConfig(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    discord_client_id: str = ""
-    app_name: str = "CRY-NO-AI Voice Assistant"
-    version: str = "2.0"
-    update_interval: int = 10
-    enable_party: bool = True
-    large_images: List[str] = ["logo", "working", "idle"]
-    small_images: List[str] = ["python", "logo"]
-    states: List[str] = ["Listening for commands", "Processing voice input", "Idle - Waiting"]
-    buttons: List[Dict[str, str]] = []
-
 class ConfigUpdate(BaseModel):
-    discord_client_id: Optional[str] = None
-    discord_bot_token: Optional[str] = None
+    discord_user_token: Optional[str] = None
+    target_user_id: Optional[str] = None
     app_name: Optional[str] = None
     update_interval: Optional[int] = None
-    enable_party: Optional[bool] = None
-    states: Optional[List[str]] = None
-    buttons: Optional[List[Dict[str, str]]] = None
 
 # ========== GLOBAL STATE ==========
 
@@ -116,11 +100,11 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Discord Bot State
-discord_bot_running = False
-discord_bot_task = None
+# Discord Self-Bot State
+discord_client_running = False
+discord_client_task = None
 
-# ========== DISCORD BOT ==========
+# ========== DISCORD SELF-BOT CLIENT ==========
 
 try:
     import discord
@@ -128,47 +112,92 @@ try:
     
     DISCORD_AVAILABLE = True
     
-    class DiscordBot(commands.Bot):
-        def __init__(self, manager: ConnectionManager, target_user_id: str = None):
-            intents = discord.Intents.default()
-            intents.guilds = True
-            intents.voice_states = True
-            intents.presences = True
-            intents.members = True
-            super().__init__(command_prefix="!", intents=intents)
+    class DiscordSelfBot(discord.Client):
+        """
+        Discord Self-Bot Client using User Account Token
+        Tracks target user across ALL servers
+        """
+        def __init__(self, manager: ConnectionManager, target_user_id: str):
+            # Self-bot intents
+            super().__init__()
             self.manager = manager
-            self.target_user_id = target_user_id or os.environ.get('TARGET_USER_ID')
-            self.monitored_user: Optional[discord.Member] = None
+            self.target_user_id = target_user_id
+            self.last_voice_state = None
+            self.speaking_users = set()
             
         async def on_ready(self):
-            logger.info(f'Discord Bot logged in as {self.user}')
-            logger.info(f'Monitoring user ID: {self.target_user_id}')
-            self.loop.create_task(self.status_update_loop())
+            logger.info(f'✅ Discord Self-Bot logged in as: {self.user}')
+            logger.info(f'🎯 Tracking User ID: {self.target_user_id}')
+            logger.info(f'📡 Connected to {len(self.guilds)} servers')
             
-        async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-            if self.target_user_id and str(member.id) != self.target_user_id:
-                return
-            await self.update_and_broadcast_status(member)
+            # Initial status check
+            await self.check_target_user_status()
             
-        async def on_presence_update(self, before: discord.Member, after: discord.Member):
-            if self.target_user_id and str(after.id) != self.target_user_id:
-                return
-            await self.update_and_broadcast_status(after)
+            # Start monitoring loop
+            self.loop.create_task(self.status_monitor_loop())
             
-        async def update_and_broadcast_status(self, member: discord.Member):
+        async def on_presence_update(self, before, after):
+            """Track presence changes (online/offline/idle/dnd)"""
+            if str(after.id) == self.target_user_id:
+                logger.info(f"👤 Presence update: {after.name} -> {after.status}")
+                await self.update_target_status(after)
+                
+        async def on_voice_state_update(self, member, before, after):
+            """Track voice state changes (join/leave VC, mute, deafen, etc.)"""
+            if str(member.id) == self.target_user_id:
+                logger.info(f"🎤 Voice state update: {member.name}")
+                
+                # Detect speaking state change
+                if after.channel:
+                    if before.self_mute != after.self_mute:
+                        logger.info(f"  Mute: {before.self_mute} -> {after.self_mute}")
+                    if before.self_deaf != after.self_deaf:
+                        logger.info(f"  Deafen: {before.self_deaf} -> {after.self_deaf}")
+                        
+                await self.update_target_status(member)
+        
+        async def on_typing(self, channel, user, when):
+            """Optional: Track typing activity"""
+            if str(user.id) == self.target_user_id:
+                logger.debug(f"⌨️ {user.name} is typing in {channel.name}")
+                
+        async def check_target_user_status(self):
+            """Find and check target user status across all servers"""
+            for guild in self.guilds:
+                member = guild.get_member(int(self.target_user_id))
+                if member:
+                    logger.info(f"📍 Found target user in: {guild.name}")
+                    await self.update_target_status(member)
+                    return True
+            
+            # User not found in any mutual server
+            logger.warning(f"⚠️ Target user {self.target_user_id} not found in any server")
+            status = DiscordStatus(
+                user_id=self.target_user_id,
+                username="User Not Found",
+                status="unknown",
+                voice_state="none",
+                timestamp=datetime.now(timezone.utc)
+            )
+            await self.manager.broadcast(status)
+            return False
+                
+        async def update_target_status(self, member):
+            """Update and broadcast target user's status"""
             voice = member.voice
             
+            # Build status object
             status = DiscordStatus(
                 user_id=str(member.id),
                 username=member.display_name or member.name,
-                discriminator=member.discriminator or "0",
+                discriminator=str(member.discriminator) if member.discriminator else "0",
                 avatar_url=str(member.display_avatar.url) if member.display_avatar else "",
                 status=str(member.status),
                 is_in_vc=voice is not None,
                 timestamp=datetime.now(timezone.utc)
             )
             
-            if voice:
+            if voice and voice.channel:
                 channel = voice.channel
                 guild = member.guild
                 
@@ -185,6 +214,7 @@ try:
                 status.is_streaming = voice.self_stream
                 status.is_video = voice.self_video
                 
+                # Determine voice state
                 if voice.self_deaf or voice.deaf:
                     status.voice_state = "deafened"
                 elif voice.self_mute or voice.mute:
@@ -192,9 +222,17 @@ try:
                 elif voice.self_stream:
                     status.voice_state = "streaming"
                 else:
-                    status.voice_state = "listening"
+                    # Check if user is in speaking_users set
+                    if str(member.id) in self.speaking_users:
+                        status.voice_state = "speaking"
+                        status.is_speaking = True
+                    else:
+                        status.voice_state = "listening"
+                        
+                logger.info(f"📊 Status: {status.username} | {status.status} | VC: {status.channel_name} | State: {status.voice_state}")
             else:
                 status.voice_state = "none"
+                logger.info(f"📊 Status: {status.username} | {status.status} | Not in VC")
                 
             # Save to database
             doc = status.model_dump(mode='json')
@@ -204,28 +242,28 @@ try:
                 upsert=True
             )
             
+            # Broadcast to all WebSocket clients
             await self.manager.broadcast(status)
-            logger.info(f"Status updated: {status.username} - {status.voice_state}")
             
-        async def status_update_loop(self):
-            """Periodically update status for connected users"""
+        async def status_monitor_loop(self):
+            """Periodically check and update target user status"""
             while True:
-                await asyncio.sleep(5)
+                await asyncio.sleep(3)  # Check every 3 seconds for real-time updates
                 try:
-                    if self.target_user_id:
-                        for guild in self.guilds:
-                            member = guild.get_member(int(self.target_user_id))
-                            if member:
-                                await self.update_and_broadcast_status(member)
-                                break
+                    for guild in self.guilds:
+                        member = guild.get_member(int(self.target_user_id))
+                        if member:
+                            await self.update_target_status(member)
+                            break
                 except Exception as e:
-                    logger.error(f"Error in status update loop: {e}")
+                    logger.error(f"Error in status monitor loop: {e}")
 
-    bot_instance: Optional[DiscordBot] = None
+    discord_client_instance: Optional[DiscordSelfBot] = None
 
-except ImportError:
+except ImportError as e:
     DISCORD_AVAILABLE = False
-    logger.warning("discord.py not available. Bot features disabled.")
+    logger.error(f"Discord library not available: {e}")
+    logger.warning("Install with: pip install discord.py-self")
 
 # ========== API ROUTES ==========
 
@@ -235,6 +273,7 @@ async def root():
         "message": "CRY-NO-AI Discord Voice Assistant API",
         "discord_available": DISCORD_AVAILABLE,
         "version": "2.0",
+        "mode": "Self-Bot (User Token)",
         "status": "running"
     }
 
@@ -249,95 +288,114 @@ async def get_current_status():
 
 @api_router.post("/status/update")
 async def update_status(status: DiscordStatus):
-    """Manually update status (for local Python script)"""
+    """Manually update status"""
     await manager.broadcast(status)
     return {"success": True, "message": "Status updated"}
 
 @api_router.get("/config")
 async def get_config():
-    """Get Rich Presence configuration"""
-    config = await db.config.find_one({"type": "rich_presence"}, {"_id": 0})
-    if not config:
-        default_config = RichPresenceConfig()
-        return default_config.model_dump()
-    return config
+    """Get current configuration"""
+    config = await db.config.find_one({"type": "selfbot_config"}, {"_id": 0})
+    return config or {
+        "target_user_id": os.environ.get('TARGET_USER_ID', ''),
+        "auto_start": os.environ.get('AUTO_START_CLIENT', 'true'),
+        "update_interval": 3
+    }
 
 @api_router.post("/config")
 async def update_config(config: ConfigUpdate):
-    """Update Rich Presence configuration"""
+    """Update configuration"""
     update_dict = {k: v for k, v in config.model_dump().items() if v is not None}
     
-    if "discord_bot_token" in update_dict:
+    if "discord_user_token" in update_dict:
+        # Store token securely
         await db.secrets.update_one(
-            {"type": "discord_bot_token"},
-            {"$set": {"value": update_dict.pop("discord_bot_token")}},
+            {"type": "discord_user_token"},
+            {"$set": {"value": update_dict.pop("discord_user_token")}},
             upsert=True
         )
+        logger.info("Discord User Token updated")
     
     if update_dict:
         await db.config.update_one(
-            {"type": "rich_presence"},
+            {"type": "selfbot_config"},
             {"$set": update_dict},
             upsert=True
         )
     
     return {"success": True, "message": "Configuration updated"}
 
-@api_router.post("/bot/start")
-async def start_discord_bot(user_id: Optional[str] = None):
-    """Start the Discord bot"""
-    global discord_bot_running, bot_instance, discord_bot_task
+@api_router.post("/client/start")
+async def start_discord_client(target_user_id: Optional[str] = None):
+    """Start the Discord Self-Bot client"""
+    global discord_client_running, discord_client_instance, discord_client_task
     
     if not DISCORD_AVAILABLE:
-        raise HTTPException(status_code=503, detail="Discord.py not available")
+        raise HTTPException(status_code=503, detail="Discord library not available. Install discord.py-self")
     
-    if discord_bot_running:
-        return {"success": False, "message": "Bot already running"}
+    if discord_client_running:
+        return {"success": False, "message": "Client already running"}
     
-    token_doc = await db.secrets.find_one({"type": "discord_bot_token"})
-    token = token_doc["value"] if token_doc else os.environ.get("DISCORD_BOT_TOKEN")
+    # Get user token from database or environment
+    token_doc = await db.secrets.find_one({"type": "discord_user_token"})
+    token = token_doc["value"] if token_doc else os.environ.get("DISCORD_USER_TOKEN")
     
     if not token:
-        raise HTTPException(status_code=400, detail="Discord bot token not configured. Add DISCORD_BOT_TOKEN to environment variables.")
+        raise HTTPException(
+            status_code=400, 
+            detail="Discord User Token not configured. Add DISCORD_USER_TOKEN to environment variables."
+        )
     
-    target_id = user_id or os.environ.get('TARGET_USER_ID')
+    # Get target user ID
+    target_id = target_user_id or os.environ.get('TARGET_USER_ID')
     
-    try:
-        bot_instance = DiscordBot(manager, target_id)
-        discord_bot_task = asyncio.create_task(bot_instance.start(token))
-        discord_bot_running = True
-        return {"success": True, "message": f"Bot starting... Monitoring user: {target_id}"}
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@api_router.post("/bot/stop")
-async def stop_discord_bot():
-    """Stop the Discord bot"""
-    global discord_bot_running, bot_instance, discord_bot_task
-    
-    if not discord_bot_running or not bot_instance:
-        return {"success": False, "message": "Bot not running"}
+    if not target_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Target User ID not configured. Add TARGET_USER_ID to environment variables."
+        )
     
     try:
-        await bot_instance.close()
-        if discord_bot_task:
-            discord_bot_task.cancel()
-        discord_bot_running = False
-        bot_instance = None
-        return {"success": True, "message": "Bot stopped"}
+        discord_client_instance = DiscordSelfBot(manager, target_id)
+        discord_client_task = asyncio.create_task(discord_client_instance.start(token))
+        discord_client_running = True
+        
+        return {
+            "success": True, 
+            "message": f"Self-Bot client starting... Tracking user: {target_id}"
+        }
     except Exception as e:
-        logger.error(f"Failed to stop bot: {e}")
+        logger.error(f"Failed to start client: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@api_router.get("/bot/status")
-async def get_bot_status():
-    """Get Discord bot status"""
+@api_router.post("/client/stop")
+async def stop_discord_client():
+    """Stop the Discord Self-Bot client"""
+    global discord_client_running, discord_client_instance, discord_client_task
+    
+    if not discord_client_running or not discord_client_instance:
+        return {"success": False, "message": "Client not running"}
+    
+    try:
+        await discord_client_instance.close()
+        if discord_client_task:
+            discord_client_task.cancel()
+        discord_client_running = False
+        discord_client_instance = None
+        return {"success": True, "message": "Client stopped"}
+    except Exception as e:
+        logger.error(f"Failed to stop client: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/client/status")
+async def get_client_status():
+    """Get Discord Self-Bot client status"""
     return {
-        "running": discord_bot_running,
+        "running": discord_client_running,
         "discord_available": DISCORD_AVAILABLE,
         "connected_clients": len(manager.active_connections),
-        "target_user_id": os.environ.get('TARGET_USER_ID', 'Not configured')
+        "target_user_id": os.environ.get('TARGET_USER_ID', 'Not configured'),
+        "mode": "Self-Bot (User Token)"
     }
 
 @api_router.get("/history")
@@ -372,7 +430,7 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.error(f"WebSocket error: {e}")
         manager.disconnect(websocket)
 
-# Include the router in the main app
+# Include the router
 app.include_router(api_router)
 
 # CORS Configuration
@@ -394,24 +452,30 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Auto-start Discord bot if configured"""
-    if os.environ.get('AUTO_START_BOT', 'false').lower() == 'true':
-        token = os.environ.get('DISCORD_BOT_TOKEN')
-        if token and DISCORD_AVAILABLE:
-            logger.info("Auto-starting Discord bot...")
+    """Auto-start Discord Self-Bot if configured"""
+    if os.environ.get('AUTO_START_CLIENT', 'true').lower() == 'true':
+        token = os.environ.get('DISCORD_USER_TOKEN')
+        target_id = os.environ.get('TARGET_USER_ID')
+        
+        if token and target_id and DISCORD_AVAILABLE:
+            logger.info("🚀 Auto-starting Discord Self-Bot...")
             try:
-                global bot_instance, discord_bot_task, discord_bot_running
-                target_id = os.environ.get('TARGET_USER_ID')
-                bot_instance = DiscordBot(manager, target_id)
-                discord_bot_task = asyncio.create_task(bot_instance.start(token))
-                discord_bot_running = True
-                logger.info(f"Discord bot auto-started. Monitoring user: {target_id}")
+                global discord_client_instance, discord_client_task, discord_client_running
+                discord_client_instance = DiscordSelfBot(manager, target_id)
+                discord_client_task = asyncio.create_task(discord_client_instance.start(token))
+                discord_client_running = True
+                logger.info(f"✅ Self-Bot auto-started. Tracking user: {target_id}")
             except Exception as e:
-                logger.error(f"Failed to auto-start bot: {e}")
+                logger.error(f"❌ Failed to auto-start Self-Bot: {e}")
+        else:
+            if not token:
+                logger.warning("⚠️ DISCORD_USER_TOKEN not set - Self-Bot not started")
+            if not target_id:
+                logger.warning("⚠️ TARGET_USER_ID not set - Self-Bot not started")
 
 @app.on_event("shutdown")
-async def shutdown_db_client():
-    global discord_bot_running, bot_instance
-    if bot_instance and discord_bot_running:
-        await bot_instance.close()
+async def shutdown_event():
+    global discord_client_running, discord_client_instance
+    if discord_client_instance and discord_client_running:
+        await discord_client_instance.close()
     client.close()
