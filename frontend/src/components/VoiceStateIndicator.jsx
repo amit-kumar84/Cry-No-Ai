@@ -313,8 +313,6 @@ export const VoiceStateIndicator = ({ voiceState, status }) => {
           />
         </div>
 
-        {/* Invite Button */}
-        <InviteButton />
       </div>
 
       {/* Corner decorations with glow */}
