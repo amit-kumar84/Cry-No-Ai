@@ -7,6 +7,7 @@ import { InfoPanel } from '../components/InfoPanel';
 import { VoiceStateIndicator } from '../components/VoiceStateIndicator';
 import { ServerInfo } from '../components/ServerInfo';
 import { ConnectionStatus } from '../components/ConnectionStatus';
+import { DiscordInviteButton } from '../components/DiscordInviteButton';
 import { 
   Wifi, 
   WifiOff, 
