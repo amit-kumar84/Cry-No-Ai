@@ -312,6 +312,9 @@ export const VoiceStateIndicator = ({ voiceState, status }) => {
             active={status.is_in_vc}
           />
         </div>
+
+        {/* Invite Button */}
+        <InviteButton />
       </div>
 
       {/* Corner decorations with glow */}
