@@ -1,399 +1,346 @@
 # 🎤 CRY-NO-AI Voice Assistant - Complete Setup Guide
+## Discord Self-Bot with Real-Time User Tracking
 
-## Discord Voice Assistant with Rich Presence Integration
+---
 
-A complete voice assistant application that shows real-time Discord status including voice channel activity, speaking/listening states, and more - all displayed on a beautiful cyberpunk-themed web dashboard.
+## ⚠️ IMPORTANT DISCLAIMER
+
+This application uses a **Discord User Token (Self-Bot)** approach, which:
+- Allows tracking ANY user across ALL your mutual servers
+- Does NOT require inviting a bot to servers
+- Uses your Discord account to monitor another user
+
+**Note:** Self-bots are against Discord's Terms of Service. Use at your own risk.
 
 ---
 
 ## 📋 Table of Contents
 
 1. [Overview](#overview)
-2. [Features](#features)
+2. [How It Works](#how-it-works)
 3. [Prerequisites](#prerequisites)
-4. [Discord Application Setup](#discord-application-setup)
-5. [Discord Bot Setup](#discord-bot-setup)
-6. [Web Dashboard Setup](#web-dashboard-setup)
-7. [Local Python Script Setup](#local-python-script-setup)
-8. [Configuration](#configuration)
+4. [Get Discord User Token](#get-discord-user-token)
+5. [Get Target User ID](#get-target-user-id)
+6. [Deploy Backend to Railway](#deploy-backend-to-railway)
+7. [Deploy Frontend to Vercel](#deploy-frontend-to-vercel)
+8. [Test Your Setup](#test-your-setup)
 9. [Troubleshooting](#troubleshooting)
-10. [FAQ](#faq)
 
 ---
 
 ## 🎯 Overview
 
-This application consists of three main components:
+### What This App Does:
+- ✅ Tracks a target user's Discord status in **real-time**
+- ✅ Shows when they go online/offline/idle/DND
+- ✅ Detects when they join/leave voice channels
+- ✅ Shows which server and channel they're in
+- ✅ Detects muted/deafened/streaming states
+- ✅ Works across ALL mutual servers (no bot invite needed!)
 
-1. **Web Dashboard** - A beautiful cyberpunk-themed React dashboard that displays real-time Discord status
-2. **Backend API** - FastAPI server that handles WebSocket connections and Discord bot integration
-3. **Local Python Script** - Optional local Rich Presence client for additional customization
-
-### Architecture
-
+### Architecture:
 ```
-┌─────────────────┐     WebSocket      ┌─────────────────┐
-│   Web Browser   │◄──────────────────►│  FastAPI Backend │
-│   (Dashboard)   │                    │  (Server)        │
-└─────────────────┘                    └────────┬────────┘
-                                                │
-                                                │ Discord Gateway
-                                                ▼
-                                       ┌─────────────────┐
-                                       │  Discord Bot    │
-                                       │  (Monitors VC)  │
-                                       └─────────────────┘
+Your Discord Account Token
+         │
+         ▼
+┌─────────────────────┐      WebSocket      ┌─────────────────┐
+│  Railway Backend    │◄───────────────────►│  Vercel Frontend │
+│  (Self-Bot Client)  │                     │  (Dashboard)     │
+└─────────────────────┘                     └─────────────────┘
+         │
+         ▼
+   Discord Gateway
+   (Track ANY User)
 ```
 
 ---
 
-## ✨ Features
+## 🔧 How It Works
 
-### Real-time Discord Monitoring
-- **User Status**: Online, Idle, DND, Offline
-- **Voice State**: Speaking, Listening, Muted, Deafened
-- **Voice Channel Info**: Server name, Channel name, Member count
-- **Streaming Detection**: Know when user is streaming
+1. **Your Discord Token** connects to Discord's Gateway API
+2. **Self-Bot** monitors the target user across all mutual servers
+3. **WebSocket** sends real-time updates to the web dashboard
+4. **Dashboard** displays beautiful cyberpunk UI with live status
 
-### Web Dashboard
-- 🎨 Cyberpunk/Futuristic theme with neon animations
-- 📊 Audio visualizer (simulated based on voice state)
-- 🔄 Real-time WebSocket updates
-- 📱 Fully responsive design
-- 🌐 Deployable online
-
-### Rich Presence
-- Custom status messages
-- Rotating images
-- Button links
-- Party system support
-- Timestamps
+**No Bot Needed!** - Since we use your account token, you can track anyone you share a server with.
 
 ---
 
 ## 📦 Prerequisites
 
-### For Web Dashboard
-- Node.js 18+ (comes with the template)
-- MongoDB (comes with the template)
-
-### For Discord Bot
-- Discord Account
-- Discord Server (to add the bot)
-
-### For Local Script (Optional)
-- Python 3.8+
-- Windows/macOS/Linux
+- Discord Account (to get user token)
+- Target User's Discord ID
+- GitHub Account
+- Railway Account (https://railway.app)
+- Vercel Account (https://vercel.com)
+- MongoDB Atlas Account (free tier: https://mongodb.com/atlas)
 
 ---
 
-## 🎮 Discord Application Setup
+## 🔑 STEP 1: Get Discord User Token
 
-### Step 1: Create Discord Application
+### Method 1: Browser Developer Tools (Recommended)
 
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click **"New Application"**
-3. Name it (e.g., "CRY-NO-AI Voice Assistant")
-4. Click **"Create"**
+1. **Open Discord in Browser**
+   - Go to https://discord.com/app
+   - Login to your account
 
-### Step 2: Get Application ID
+2. **Open Developer Tools**
+   - Press `F12` or `Ctrl+Shift+I` (Windows/Linux)
+   - Press `Cmd+Option+I` (Mac)
 
-1. In your application, go to **"General Information"**
-2. Copy the **"Application ID"** (also called Client ID)
-3. Save this - you'll need it later
+3. **Go to Network Tab**
+   - Click on "Network" tab
+   - In the filter box, type `api`
 
-### Step 3: Upload Rich Presence Images
+4. **Trigger an API Call**
+   - Click on any channel or server in Discord
+   - You'll see network requests appear
 
-1. Go to **"Rich Presence"** → **"Art Assets"**
-2. Click **"Add Image(s)"**
-3. Upload your 512x512 PNG images:
-   - `logo.png` - Main logo
-   - `working.png` - Working state
-   - `idle.png` - Idle state
-   - `listening.png` - Listening state
-   - `speaking.png` - Speaking state
-   - `python.png` - Small icon
-   - `online.png` - Online indicator
-   - `away.png` - Away indicator
+5. **Find Your Token**
+   - Click on any request to `discord.com/api`
+   - Go to "Headers" tab
+   - Look for `Authorization` header
+   - Copy the token value (starts with a long string)
 
-> **Note**: Image names become the keys you use in config. No spaces allowed.
+### Method 2: Console Method
 
-### Step 4: Save Application
+1. Open Discord in browser
+2. Open Developer Tools (`F12`)
+3. Go to "Console" tab
+4. Paste this code and press Enter:
 
-Click **"Save Changes"** at the bottom.
+```javascript
+(webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m).find(m=>m?.exports?.default?.getToken!==void 0).exports.default.getToken()
+```
 
----
+5. Copy the token that appears
 
-## 🤖 Discord Bot Setup
-
-### Step 1: Create Bot
-
-1. In your Discord Application, go to **"Bot"**
-2. Click **"Add Bot"**
-3. Confirm by clicking **"Yes, do it!"**
-
-### Step 2: Get Bot Token
-
-1. Under **"Token"**, click **"Reset Token"**
-2. Copy the token immediately (it won't be shown again!)
-3. **KEEP THIS SECRET** - Never share your bot token
-
-### Step 3: Enable Intents
-
-In the Bot settings, enable these **Privileged Gateway Intents**:
-- ✅ **Presence Intent** - For user status
-- ✅ **Server Members Intent** - For member info
-- ✅ **Message Content Intent** (optional)
-
-### Step 4: Generate Bot Invite Link
-
-1. Go to **"OAuth2"** → **"URL Generator"**
-2. Select scopes:
-   - ✅ `bot`
-   - ✅ `applications.commands`
-3. Select bot permissions:
-   - ✅ View Channels
-   - ✅ Connect (to voice channels)
-   - ✅ Read Message History
-4. Copy the generated URL
-
-### Step 5: Invite Bot to Server
-
-1. Open the generated URL in your browser
-2. Select your Discord server
-3. Click **"Authorize"**
-4. Complete the captcha
+### ⚠️ SECURITY WARNING
+- **NEVER** share your token with anyone
+- **NEVER** commit your token to GitHub
+- Your token = Full access to your Discord account
 
 ---
 
-## 🌐 Web Dashboard Setup
+## 👤 STEP 2: Get Target User ID
 
-### Step 1: Configure Backend
+### Method 1: Discord Settings
 
-Add your Discord Bot Token to the backend `.env` file:
+1. Open Discord
+2. Go to **User Settings** → **Advanced**
+3. Enable **Developer Mode**
+4. Right-click on the user you want to track
+5. Click **"Copy User ID"**
+
+### Your Target User ID:
+```
+656804552175124481
+```
+
+---
+
+## 🚂 STEP 3: Deploy Backend to Railway
+
+### 3.1 Push Code to GitHub
 
 ```bash
-# /app/backend/.env
-DISCORD_BOT_TOKEN=your_bot_token_here
+# Clone or download the project
+git clone https://github.com/YOUR_USERNAME/cry-no-ai.git
+cd cry-no-ai
+
+# Make sure .env files are in .gitignore (IMPORTANT!)
+echo "*.env" >> .gitignore
+echo "backend/.env" >> .gitignore
+
+# Commit and push
+git add .
+git commit -m "Initial commit"
+git push origin main
 ```
 
-### Step 2: Start the Bot
+### 3.2 Create Railway Project
 
-Send a POST request to start the bot:
+1. Go to https://railway.app/dashboard
+2. Click **"New Project"**
+3. Select **"Deploy from GitHub repo"**
+4. Select your repository
 
-```bash
-curl -X POST "https://your-app-url/api/bot/start?user_id=YOUR_DISCORD_USER_ID"
+### 3.3 Configure Railway
+
+1. Click on your service
+2. Go to **Settings** tab
+3. Set **Root Directory**: `backend`
+
+### 3.4 Add Environment Variables
+
+Go to **Variables** tab and add:
+
+| Variable | Value |
+|----------|-------|
+| `MONGO_URL` | `mongodb+srv://kumaramit812670:YOUR_PASSWORD@cluster0.y8slewi.mongodb.net/?appName=Cluster0` |
+| `DB_NAME` | `cry_no_ai_db` |
+| `DISCORD_USER_TOKEN` | `Your Discord Token from Step 1` |
+| `TARGET_USER_ID` | `656804552175124481` |
+| `AUTO_START_CLIENT` | `true` |
+| `CORS_ORIGINS` | `*` |
+
+### 3.5 Generate Domain
+
+1. Go to **Settings** → **Networking**
+2. Click **"Generate Domain"**
+3. Copy your URL (e.g., `https://cry-no-ai-production.up.railway.app`)
+
+### 3.6 Verify Backend
+
+Open in browser:
+```
+https://YOUR-RAILWAY-URL.up.railway.app/api/
 ```
 
-Replace `YOUR_DISCORD_USER_ID` with your Discord user ID:
-- Enable Developer Mode in Discord (Settings → Advanced)
-- Right-click your profile → "Copy User ID"
-
-### Step 3: Access Dashboard
-
-Open your deployed URL in a browser. The dashboard will:
-- Connect via WebSocket
-- Display real-time status updates
-- Show audio visualizer animations
-
----
-
-## 🐍 Local Python Script Setup (Optional)
-
-The local script provides additional Rich Presence features that run on your computer.
-
-### Step 1: Download Files
-
-Download these files to a folder:
-- `voice_assistant_rich.py`
-- `config.json`
-- `create_images.py`
-- `setup_and_run.bat` (Windows)
-- `build_exe.py` (to create .exe)
-
-### Step 2: Run Setup (Windows)
-
-Double-click `setup_and_run.bat` or run in terminal:
-
-```batch
-setup_and_run.bat
-```
-
-This will:
-1. Check Python installation
-2. Create virtual environment
-3. Install dependencies
-4. Generate default icons
-5. Start the voice assistant
-
-### Step 3: Manual Setup (macOS/Linux)
-
-```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install pypresence pillow websockets aiohttp
-
-# Generate icons
-python create_images.py
-
-# Run the assistant
-python voice_assistant_rich.py
-```
-
-### Step 4: Configure
-
-Edit `config.json`:
-
+You should see:
 ```json
 {
-    "discord_client_id": "YOUR_APPLICATION_ID",
-    "app_name": "CRY-NO-AI Voice Assistant",
-    "web_dashboard_url": "https://your-deployed-url.com",
-    "enable_web_sync": true
+  "message": "CRY-NO-AI Discord Voice Assistant API",
+  "discord_available": true,
+  "mode": "Self-Bot (User Token)",
+  "status": "running"
 }
 ```
 
 ---
 
-## ⚙️ Configuration
+## ▲ STEP 4: Deploy Frontend to Vercel
 
-### config.json Options
+### 4.1 Create Vercel Project
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `discord_client_id` | string | Your Discord Application ID |
-| `app_name` | string | Display name in Rich Presence |
-| `version` | string | Version shown in status |
-| `update_interval` | number | Seconds between status updates |
-| `enable_party` | boolean | Enable party system in VC |
-| `web_dashboard_url` | string | URL of deployed dashboard |
-| `enable_web_sync` | boolean | Sync status to web dashboard |
-| `rich_presence.large_images` | array | Large image keys to cycle |
-| `rich_presence.small_images` | array | Small image keys to cycle |
-| `rich_presence.states` | array | Status messages to rotate |
-| `rich_presence.buttons` | array | Buttons with labels and URLs |
+1. Go to https://vercel.com/dashboard
+2. Click **"Add New..."** → **"Project"**
+3. Import your GitHub repository
 
-### Backend Environment Variables
+### 4.2 Configure Build Settings
 
-| Variable | Description |
-|----------|-------------|
-| `DISCORD_BOT_TOKEN` | Your Discord bot token |
-| `MONGO_URL` | MongoDB connection string |
-| `DB_NAME` | Database name |
+- **Framework Preset**: Create React App
+- **Root Directory**: `frontend`
+- **Build Command**: `yarn build`
+- **Output Directory**: `build`
+
+### 4.3 Add Environment Variable
+
+| Name | Value |
+|------|-------|
+| `REACT_APP_BACKEND_URL` | `https://YOUR-RAILWAY-URL.up.railway.app` |
+
+### 4.4 Deploy
+
+Click **"Deploy"** and wait 2-3 minutes.
+
+---
+
+## 🔄 STEP 5: Update CORS
+
+After Vercel deployment:
+
+1. Go to Railway Dashboard → Variables
+2. Update `CORS_ORIGINS` to:
+```
+https://your-app.vercel.app
+```
+
+---
+
+## ✅ STEP 6: Test Your Setup
+
+### Test Backend API:
+```bash
+# Check client status
+curl https://YOUR-RAILWAY-URL.up.railway.app/api/client/status
+
+# Check current status
+curl https://YOUR-RAILWAY-URL.up.railway.app/api/status
+```
+
+### Test Frontend:
+1. Open your Vercel URL
+2. You should see the target user's status updating in real-time
+3. When they join a VC, you'll see server and channel info!
+
+---
+
+## 🔧 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/` | GET | API info |
+| `/api/status` | GET | Current user status |
+| `/api/client/start` | POST | Start Self-Bot |
+| `/api/client/stop` | POST | Stop Self-Bot |
+| `/api/client/status` | GET | Client status |
+| `/api/ws` | WebSocket | Real-time updates |
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Discord Connection Issues
+### "Token Invalid" Error
+- Make sure you copied the entire token
+- Token format should be a long string of letters/numbers
+- Try getting a fresh token from Discord
 
-**Problem**: "Discord not running" error
-- **Solution**: Make sure Discord desktop app is running (web version won't work)
+### "User Not Found" 
+- Make sure you share at least one server with the target user
+- Verify the TARGET_USER_ID is correct
+- Check if the target user is not blocked
 
-**Problem**: "Invalid Client ID" error
-- **Solution**: Check your Application ID is correct in config.json
+### Status Not Updating
+- Check Railway logs for errors
+- Verify DISCORD_USER_TOKEN is correct
+- Make sure AUTO_START_CLIENT is `true`
 
-**Problem**: Bot not responding
-- **Solution**: 
-  1. Check bot token is correct
-  2. Verify bot is in the server
-  3. Check intents are enabled
+### WebSocket Connection Failed
+- Verify REACT_APP_BACKEND_URL is correct
+- Check if CORS_ORIGINS includes your Vercel domain
+- Try clearing browser cache
 
-### WebSocket Issues
-
-**Problem**: Dashboard shows "Reconnecting..."
-- **Solution**:
-  1. Check backend is running
-  2. Verify CORS settings allow your domain
-  3. Check browser console for errors
-
-### Rich Presence Not Showing
-
-**Problem**: Status not appearing in Discord
-- **Solution**:
-  1. Disable "Display current activity" then re-enable it
-  2. Restart Discord
-  3. Check Game Activity settings in Discord
-
-### Image Issues
-
-**Problem**: Images not showing in Rich Presence
-- **Solution**:
-  1. Images must be exactly 512x512 PNG
-  2. Wait 10-15 minutes after uploading (Discord caches)
-  3. Image key must match exactly (case-sensitive)
+### Railway Build Fails
+- Check if requirements.txt is valid
+- Make sure root directory is set to `backend`
 
 ---
 
-## ❓ FAQ
+## 📊 What Data Is Tracked
 
-### Q: Can I use this without a Discord bot?
-
-**A:** Yes! The local Python script works independently using Rich Presence. The bot is only needed for real-time VC monitoring on the web dashboard.
-
-### Q: Is my bot token safe?
-
-**A:** Never share your bot token publicly. Store it in environment variables, not in code.
-
-### Q: Why isn't my voice state updating?
-
-**A:** The bot needs to be in the same server as you. Make sure:
-1. Bot is invited to your server
-2. Bot has correct permissions
-3. You've specified your user ID when starting the bot
-
-### Q: Can others see my status?
-
-**A:** 
-- Rich Presence: Only Discord friends can see your "Playing" status
-- Web Dashboard: Anyone with the URL can see it (if deployed publicly)
-
-### Q: How do I add more images?
-
-**A:** 
-1. Create 512x512 PNG images
-2. Upload to Discord Developer Portal → Rich Presence → Art Assets
-3. Add the image key to your config.json arrays
-
-### Q: Does this work on mobile?
-
-**A:** 
-- Web Dashboard: Yes, fully responsive
-- Rich Presence: Only on desktop Discord
+| Data | Description |
+|------|-------------|
+| Status | online, offline, idle, dnd |
+| Voice State | speaking, listening, muted, deafened, streaming |
+| Server Name | Which server they're in |
+| Channel Name | Which voice channel |
+| Member Count | How many in the VC |
+| Avatar | Profile picture |
+| Username | Display name |
 
 ---
 
-## 🚀 Quick Start Checklist
+## 🎉 You're Done!
 
-- [ ] Created Discord Application
-- [ ] Copied Application ID
-- [ ] Created Discord Bot
-- [ ] Copied Bot Token (keep secret!)
-- [ ] Enabled Privileged Intents
-- [ ] Invited Bot to server
-- [ ] Added Bot Token to backend .env
-- [ ] Started the bot via API
-- [ ] Opened web dashboard
-- [ ] (Optional) Set up local Python script
+Your CRY-NO-AI Voice Assistant is now live:
+
+- **Frontend**: `https://your-app.vercel.app`
+- **Backend**: `https://your-app.up.railway.app`
+
+The dashboard will automatically show real-time status of your target user!
 
 ---
 
-## 📞 Support
+## 🔒 Security Best Practices
 
-If you encounter issues:
-1. Check the troubleshooting section above
-2. Review Discord Developer Documentation
-3. Check browser/server console for errors
-
----
-
-## 📄 License
-
-MIT License - Feel free to modify and use as needed.
+1. ✅ Never commit tokens to GitHub
+2. ✅ Use environment variables for all secrets
+3. ✅ Rotate your token if compromised
+4. ✅ Keep your Railway/Vercel dashboards private
+5. ✅ Use a secondary Discord account if concerned
 
 ---
 
-**Happy Monitoring! 🎮**
+**Happy Tracking! 🎮**
