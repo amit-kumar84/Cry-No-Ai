@@ -120,14 +120,6 @@ export default function Dashboard() {
           >
             <StatusCard status={status} />
             <VoiceStateIndicator voiceState={status.voice_state} status={status} />
-            {/* Discord Invite Button - Below Voice State */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              <DiscordInviteButton />
-            </motion.div>
           </motion.div>
 
           {/* Center Column - Audio Visualizer */}
