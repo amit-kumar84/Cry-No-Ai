@@ -9,7 +9,9 @@ import {
   Wifi,
   WifiOff,
   MonitorPlay,
-  AudioWaveform
+  AudioWaveform,
+  UserPlus,
+  ExternalLink
 } from 'lucide-react';
 
 const VOICE_STATES = {
